@@ -93,13 +93,13 @@ public class AppSettings
             if (File.Exists(SettingsFile))
             {
                 var json = File.ReadAllText(SettingsFile);
-                return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                settings.Validate();
+                return settings;
             }
         }
-        catch
-        {
-            // Return defaults on error
-        }
+        catch (JsonException) { /* Invalid JSON, use defaults */ }
+        catch (IOException) { /* File access error, use defaults */ }
 
         return new AppSettings();
     }
@@ -117,9 +117,30 @@ public class AppSettings
             var json = JsonSerializer.Serialize(this, options);
             File.WriteAllText(SettingsFile, json);
         }
-        catch
+        catch (IOException) { /* File access error, ignore */ }
+        catch (UnauthorizedAccessException) { /* Permission error, ignore */ }
+    }
+
+    /// <summary>
+    /// Validates and corrects settings to ensure valid state.
+    /// </summary>
+    private void Validate()
+    {
+        // Ensure valid ping interval
+        if (PingIntervalSeconds is not (30 or 60 or 120))
+            PingIntervalSeconds = 30;
+
+        // Ensure at least one active day
+        if (ActiveDays == null || ActiveDays.Count == 0)
         {
-            // Silently fail - not critical
+            ActiveDays = new List<DayOfWeek>
+            {
+                DayOfWeek.Monday,
+                DayOfWeek.Tuesday,
+                DayOfWeek.Wednesday,
+                DayOfWeek.Thursday,
+                DayOfWeek.Friday
+            };
         }
     }
 }

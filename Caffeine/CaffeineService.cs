@@ -105,9 +105,18 @@ public class CaffeineService
     /// </summary>
     public void Stop()
     {
-        _cts?.Cancel();
-        try { _task?.Wait(1000); } catch { }
-        _cts?.Dispose();
+        var cts = _cts;
+        if (cts == null) return;
+
+        cts.Cancel();
+        try
+        {
+            _task?.Wait(1000);
+        }
+        catch (AggregateException) { /* Expected on cancellation */ }
+        catch (OperationCanceledException) { /* Expected */ }
+
+        cts.Dispose();
         _cts = null;
 
         // Restore normal execution state
@@ -117,7 +126,14 @@ public class CaffeineService
     /// <summary>
     /// Checks if the service is currently running.
     /// </summary>
-    public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
+    public bool IsRunning
+    {
+        get
+        {
+            var cts = _cts;
+            return cts != null && !cts.IsCancellationRequested;
+        }
+    }
 
     private async Task RunLoopAsync(CancellationToken ct)
     {

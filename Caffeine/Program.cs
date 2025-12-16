@@ -252,9 +252,10 @@ class TrayApp : ApplicationContext
 
     private void Exit(object? sender, EventArgs e)
     {
-        _scheduleTimer.Stop();
-        _service.Stop();
-        _trayIcon.Visible = false;
+        _scheduleTimer?.Stop();
+        _scheduleTimer?.Dispose();
+        _service?.Stop();
+        _trayIcon?.Dispose();
         Application.Exit();
     }
 }
