@@ -32,16 +32,54 @@ public class CaffeineService
     [DllImport("kernel32.dll")]
     private static extern uint SetThreadExecutionState(uint esFlags);
 
-    [DllImport("user32.dll")]
-    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INPUT
+    {
+        public uint type;
+        public InputUnion u;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct InputUnion
+    {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    // Input type constants
+    private const uint INPUT_KEYBOARD = 1;
 
     // Execution state flags
     private const uint ES_CONTINUOUS = 0x80000000;
     private const uint ES_SYSTEM_REQUIRED = 0x00000001;
     private const uint ES_DISPLAY_REQUIRED = 0x00000002;
 
-    // F15 virtual key code (ghost key - doesn't interfere with anything)
-    private const byte VK_F15 = 0x7E;
+    // F24 virtual key code (ghost key - doesn't interfere with anything)
+    private const ushort VK_F24 = 0x87;
 
     // Key event flags
     private const uint KEYEVENTF_KEYUP = 0x0002;
@@ -155,9 +193,8 @@ public class CaffeineService
     {
         _pingCount++;
 
-        // Press F15 key (ghost key - doesn't affect anything)
-        keybd_event(VK_F15, 0, 0, UIntPtr.Zero);           // Key down
-        keybd_event(VK_F15, 0, KEYEVENTF_KEYUP, UIntPtr.Zero); // Key up
+        // Press F24 key using modern SendInput API (ghost key - doesn't affect anything)
+        SendKey(VK_F24);
 
         // Reinforce execution state
         uint flags = ES_SYSTEM_REQUIRED;
@@ -166,5 +203,46 @@ public class CaffeineService
         SetThreadExecutionState(flags);
 
         OnPing?.Invoke(_pingCount);
+    }
+
+    private void SendKey(ushort keyCode)
+    {
+        var inputs = new INPUT[2];
+
+        // Key down
+        inputs[0] = new INPUT
+        {
+            type = INPUT_KEYBOARD,
+            u = new InputUnion
+            {
+                ki = new KEYBDINPUT
+                {
+                    wVk = keyCode,
+                    wScan = 0,
+                    dwFlags = 0,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            }
+        };
+
+        // Key up
+        inputs[1] = new INPUT
+        {
+            type = INPUT_KEYBOARD,
+            u = new InputUnion
+            {
+                ki = new KEYBDINPUT
+                {
+                    wVk = keyCode,
+                    wScan = 0,
+                    dwFlags = KEYEVENTF_KEYUP,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            }
+        };
+
+        SendInput(2, inputs, Marshal.SizeOf<INPUT>());
     }
 }
