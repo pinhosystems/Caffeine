@@ -71,18 +71,13 @@ public class CaffeineService
     }
 
     // Input type constants
-    private const uint INPUT_KEYBOARD = 1;
+    private const uint INPUT_MOUSE = 0;
+    private const uint MOUSEEVENTF_MOVE = 0x0001;
 
     // Execution state flags
     private const uint ES_CONTINUOUS = 0x80000000;
     private const uint ES_SYSTEM_REQUIRED = 0x00000001;
     private const uint ES_DISPLAY_REQUIRED = 0x00000002;
-
-    // F24 virtual key code (ghost key - doesn't interfere with anything)
-    private const ushort VK_F24 = 0x87;
-
-    // Key event flags
-    private const uint KEYEVENTF_KEYUP = 0x0002;
 
     #endregion
 
@@ -193,8 +188,8 @@ public class CaffeineService
     {
         _pingCount++;
 
-        // Press F24 key using modern SendInput API (ghost key - doesn't affect anything)
-        SendKey(VK_F24);
+        // Invisible mouse move (0 pixels) - doesn't interfere with any application
+        SendInvisibleMouseMove();
 
         // Reinforce execution state
         uint flags = ES_SYSTEM_REQUIRED;
@@ -205,44 +200,25 @@ public class CaffeineService
         OnPing?.Invoke(_pingCount);
     }
 
-    private void SendKey(ushort keyCode)
+    private void SendInvisibleMouseMove()
     {
-        var inputs = new INPUT[2];
-
-        // Key down
-        inputs[0] = new INPUT
+        var input = new INPUT
         {
-            type = INPUT_KEYBOARD,
+            type = INPUT_MOUSE,
             u = new InputUnion
             {
-                ki = new KEYBDINPUT
+                mi = new MOUSEINPUT
                 {
-                    wVk = keyCode,
-                    wScan = 0,
-                    dwFlags = 0,
+                    dx = 0,
+                    dy = 0,
+                    mouseData = 0,
+                    dwFlags = MOUSEEVENTF_MOVE,
                     time = 0,
                     dwExtraInfo = IntPtr.Zero
                 }
             }
         };
 
-        // Key up
-        inputs[1] = new INPUT
-        {
-            type = INPUT_KEYBOARD,
-            u = new InputUnion
-            {
-                ki = new KEYBDINPUT
-                {
-                    wVk = keyCode,
-                    wScan = 0,
-                    dwFlags = KEYEVENTF_KEYUP,
-                    time = 0,
-                    dwExtraInfo = IntPtr.Zero
-                }
-            }
-        };
-
-        SendInput(2, inputs, Marshal.SizeOf<INPUT>());
+        SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
     }
 }
